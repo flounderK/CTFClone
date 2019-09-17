@@ -108,7 +108,7 @@ if __name__ == "__main__":
                                if re.search(r'(#(challenge|solves)|/users/)', i.attrs['href']) is None]
 
             downloaded_file_paths = [download_file(driver, urllib.parse.urljoin(base_url, tag.attrs['href']),
-                                                   tag.get_text(strip=True))
+                                                   re.sub(r'[/:]', '_', tag.get_text(strip=True)))
                                      for tag in files_and_links]
             # Create Challenge dir ect
             Challenge(name, category_name, message, value, downloaded_file_paths, parent_path)
@@ -117,4 +117,4 @@ if __name__ == "__main__":
             page_reached(driver, challenge_url)
             wait.until(EC.presence_of_all_elements_located)
 
-
+    driver.quit()
