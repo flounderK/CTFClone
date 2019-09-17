@@ -6,6 +6,8 @@ import time
 import re
 from Challenge import Challenge
 import os
+import urllib.parse
+
 
 def page_is_loaded(driver):
     return driver.find_element_by_tag_name("body") is not None
@@ -16,13 +18,18 @@ def page_reached(driver, url):
         time.sleep(20)
 
 
-def download_file(driver, link):
+def id_element_present(driver, id_name):
+    while driver.find_element_by_id(id_name) is None:
+        time.sleep(10)
+
+
+def download_file(driver, link, filename):
     """
     Download link with selenium driver
     """
-    pass
-    file_path = ""
-    return file_path
+    download_path = os.path.join(os.environ['HOME'], "Downloads", filename)
+    driver.get(link)
+    return download_path
 
 
 parser = argparse.ArgumentParser()
@@ -50,27 +57,37 @@ challenge_page_soup = BeautifulSoup(driver.page_source, "html.parser")
 challenge_page_links = set(challenge_page_soup.find_all("a"))
 challenges_board = challenge_page_soup.find("div", id="challenges-board")
 
-buttons = challenges_board.find_all("button")
 
-for button in buttons:
-    id_attr = button.parent.attrs['id']
-    xpath = f'//*[@id="{id_attr}"]/button'
-    button_element = driver.find_element_by_xpath(xpath)
-    button_element.click()
-    wait.until(page_is_loaded)
-    soup = BeautifulSoup(driver.page_source, "html.parser")
-    this_challenge_page_links = set(soup.find_all("a"))
-    new_links = list(this_challenge_page_links - challenge_page_links)
-    files_and_links = [i for i in new_links
-                       if re.match(r'#(challenge|solves)', i.attrs['href']) is None]
+challenge_categories = challenges_board.children
 
-    downloaded_file_paths = [download_file(driver, link) for link in files_and_links]
-    name = ""
-    category = ""
-    message = ""
-    value = ""
-    # Challenge(name, category, message, value, downloaded_file_paths, parent_path)
-    # re-navigate to challenge_url
-    # driver.get(challenge_url)
+for category in challenge_categories:
+
+    category_name = category.find("div", attrs={"class": "category-header"}).get_text()
+    challenges = category.find("div", attrs={"class": "category-challenges"})
+    buttons = challenges.find_all("button")
+    for button in buttons:
+        name = button.find("p").get_text(strip=True)
+        value = button.find("span").get_text(strip=True)
+
+        id_attr = button.parent.attrs['id']
+        xpath = f'//*[@id="{id_attr}"]/button'
+        button_element = driver.find_element_by_xpath(xpath)
+        button_element.click()
+        wait.until(page_is_loaded)
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        message = soup.find("span", attrs={"class": "challenge-desc"}).get_text(strip=True)
+        this_challenge_page_links = set(soup.find_all("a"))
+        new_links = list(this_challenge_page_links - challenge_page_links)
+        files_and_links = [i for i in new_links
+                           if re.match(r'#(challenge|solves)', i.attrs['href']) is None]
+
+        downloaded_file_paths = [download_file(driver, urllib.parse.urljoin(base_url, tag.attrs['href']),
+                                               tag.get_text(strip=True))
+                                 for tag in files_and_links]
+        # Create Challenge dir ect
+        Challenge(name, category_name, message, value, downloaded_file_paths, parent_path)
+        # re-navigate to challenge_url
+        driver.get(challenge_url)
+        wait.until(page_is_loaded)
 
 
